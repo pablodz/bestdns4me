@@ -11,3 +11,9 @@ Sometimes DNS resolvers are slow, or not working, or not responding, or not reso
 - Windows
 - Linux
 - MacOs
+
+## Download 
+
+- Go to https://github.com/pablodz/bestdns4me/releases/
+- Download the file for your OS
+- Run it, and just works
