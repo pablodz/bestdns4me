@@ -15,8 +15,8 @@ import (
 
 func main() {
 
-	numOfTests := 10
-	timeoutDnsResolve := 5 * time.Second
+	numOfTests := 5
+	timeoutDnsResolve := 1 * time.Second
 	// Get a list of public DNS providers from a public site that lists them for free
 	dnsProviders, err := getPublicDNSProviders()
 	if err != nil {
@@ -39,7 +39,7 @@ func main() {
 	bar := progressbar.NewOptions(totalTests,
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowBytes(false),
-		progressbar.OptionClearOnFinish(),
+		// progressbar.OptionClearOnFinish(),
 		// progressbar.OptionSetWidth(80),
 		progressbar.OptionSetDescription("[cyan][👽][reset] Doing lookups..."),
 		progressbar.OptionSetTheme(progressbar.Theme{
@@ -54,6 +54,7 @@ func main() {
 	resultCh := make(chan dnsResult)
 	// Test each DNS provider in a separate goroutine
 	for dnsName, dnsIp := range dnsProviders {
+		bar.Add(1)
 		go doMultipleDsnLookupHost(&dsnRequest{
 			Timeout2Lookup: timeoutDnsResolve,
 			domains:        domains,
@@ -62,7 +63,6 @@ func main() {
 			providerName:   dnsName,
 			resultCh:       resultCh,
 		})
-		bar.Add(1)
 	}
 
 	bar.Finish()
@@ -140,25 +140,25 @@ func getPublicDNSProviders() (map[string]string, error) {
 func getDomains() ([]string, error) {
 
 	return []string{
-		"amazon.com",
-		"apple.com",
-		"blogger.com",
-		"dropbox.com",
-		"ebay.com",
-		"facebook.com",
+		// "amazon.com",
+		// "apple.com",
+		// "blogger.com",
+		// "dropbox.com",
+		// "ebay.com",
+		// "facebook.com",
 		"github.com",
 		"google.com",
-		"hotmail.com",
-		"instagram.com",
+		// "hotmail.com",
+		// "instagram.com",
 		"linkedin.com",
-		"pinterest.com",
-		"reddit.com",
-		"salesforce.com",
-		"shopify.com",
-		"spotify.com",
-		"twitter.com",
-		"whatsapp.com",
-		"yahoo.com",
+		// "pinterest.com",
+		// "reddit.com",
+		// "salesforce.com",
+		// "shopify.com",
+		// "spotify.com",
+		// "twitter.com",
+		// "whatsapp.com",
+		// "yahoo.com",
 		"youtube.com",
 	}, nil
 
@@ -184,7 +184,7 @@ func doMultipleDsnLookupHost(req *dsnRequest) {
 		if nErr != 0 {
 			// log.Println("Error", req.providerIp, req.providerName, req.Timeout2Lookup, req.domains[domIdx])
 			req.resultCh <- dnsResult{
-				Error:        errors.New("sasfasf"),
+				Error:        errors.New("Time"),
 				providerName: req.providerName,
 				providerIp:   req.providerIp,
 				avgTime:      req.Timeout2Lookup,
@@ -208,5 +208,5 @@ func doLookupHostWithTimeout(domain string, timeout time.Duration) ([]string, er
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return net.DefaultResolver.LookupHost(ctx, "example.com")
+	return net.DefaultResolver.LookupHost(ctx, domain)
 }
