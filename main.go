@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"math/rand"
+	"log"
 	"net"
 	"os"
 	"text/tabwriter"
@@ -12,21 +14,32 @@ import (
 )
 
 func main() {
+
+	numOfTests := 5
+	timeoutDnsResolve := 1 * time.Second
 	// Get a list of public DNS providers from a public site that lists them for free
 	dnsProviders, err := getPublicDNSProviders()
 	if err != nil {
-		fmt.Printf("Error getting public DNS providers: %s\n", err)
+		log.Printf("Error getting public DNS providers: %s\n", err)
+		return
+	}
+	domains, err := getDomains()
+	if err != nil {
+		log.Printf("Error getting Domains %s", err)
 		return
 	}
 
-	amountOfTestsPerDNS := 10
 	// Set up the progress bar
-	lenDNS := len(dnsProviders)
+	lenDNSProv := len(dnsProviders)
+	lenDomains := len(domains)
+	totalTests := numOfTests * lenDNSProv * lenDomains
+	totalResolve := lenDNSProv
 
 	// create and start new bar
-	bar := progressbar.NewOptions(lenDNS*amountOfTestsPerDNS,
+	bar := progressbar.NewOptions(totalTests,
 		progressbar.OptionEnableColorCodes(true),
 		progressbar.OptionShowBytes(false),
+		// progressbar.OptionClearOnFinish(),
 		// progressbar.OptionSetWidth(80),
 		progressbar.OptionSetDescription("[cyan][👽][reset] Doing lookups..."),
 		progressbar.OptionSetTheme(progressbar.Theme{
@@ -39,67 +52,62 @@ func main() {
 
 	// Use a channel to receive the results from the goroutines
 	resultCh := make(chan dnsResult)
-
 	// Test each DNS provider in a separate goroutine
-	for provider, ip := range dnsProviders {
-		go func(ip string, provider string) {
-			var total time.Duration
-			for i := 0; i < amountOfTestsPerDNS; i++ {
-				// Update the progress bar
-				bar.Add(1)
-				// generate lookup
-				domains := []string{"google.com", "youtube.com", "hotmail.com", "whatsapp.com", "instagram.com"}
-				domain := domains[rand.Intn(len(domains))]
-				// Do the DNS lookup
-				start := time.Now()
-				_, err := net.LookupHost(domain)
-				elapsed := time.Since(start)
-
-				if err != nil {
-					fmt.Printf("Error connecting to %s: %s\n", ip, err)
-					continue
-				}
-
-				total += elapsed
-			}
-			average := total / time.Duration(amountOfTestsPerDNS)
-			resultCh <- dnsResult{
-				providerName: provider,
-				providerIp:   ip,
-				elapsed:      average,
-			}
-		}(ip, provider)
+	for dnsName, dnsIp := range dnsProviders {
+		bar.Add(1)
+		go doMultipleDsnLookupHost(&dsnRequest{
+			Timeout2Lookup: timeoutDnsResolve,
+			domains:        domains,
+			numberOfTtest:  numOfTests,
+			providerIp:     dnsIp,
+			providerName:   dnsName,
+			resultCh:       resultCh,
+		})
 	}
 
+	bar.Finish()
+
 	// Print the results in a tab-separated table
-	w := &tabwriter.Writer{}
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	// print column names
+	fmt.Fprintln(w, "\nDNS Owner\tDNS Provider\tAverage Time(ms)")
+
 	// Wait for all goroutines to complete and store the results in the map
-	for i := 0; i < len(dnsProviders); i++ {
+	for i := 0; i < totalResolve; i++ {
 		result := <-resultCh
-		if i == 0 {
-			// fmt.Println()
-			// fmt.Println()
-			// print settings in the test
-			w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			// print column names
-			fmt.Fprintln(w, "\nDNS Owner\tDNS Provider\tAverage Time(microseconds)(Less is better)")
+		if result.Error != nil {
+			fmt.Fprintf(w, "%s\t%s\t%s\n", result.providerName, result.providerIp, "Timeout")
+		} else {
+			fmt.Fprintf(w, "%s\t%s\t%s\n", result.providerName, result.providerIp, fmt.Sprint(result.avgTime.Milliseconds()))
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\n", result.providerName, result.providerIp, fmt.Sprint(result.elapsed.Microseconds()))
+		if i == totalResolve-1 {
+			break
+		}
 	}
 
 	w.Flush()
 
 	// Message to the user
-	fmt.Println()
-	fmt.Println("*We recommend using the DNS provider that has the fastest connection time.")
+	fmt.Println("\n*We recommend using the DNS provider that has the fastest connection time.")
+	fmt.Println("Less time is better.")
 
+}
+
+type dsnRequest struct {
+	Timeout2Lookup time.Duration
+	domains        []string
+	numberOfTtest  int
+	providerIp     string
+	providerName   string
+	resultCh       chan dnsResult
 }
 
 // dnsResult represents the result of a DNS lookup
 type dnsResult struct {
+	Error        error
 	providerName string
 	providerIp   string
-	elapsed      time.Duration
+	avgTime      time.Duration
 }
 
 // getPublicDNSProviders fetches a list of public DNS providers from a public site
@@ -127,4 +135,78 @@ func getPublicDNSProviders() (map[string]string, error) {
 		"Verisign":           "64.6.64.6",
 		"Verisign.2":         "64.6.65.6",
 	}, nil
+}
+
+func getDomains() ([]string, error) {
+
+	return []string{
+		// "amazon.com",
+		// "apple.com",
+		// "blogger.com",
+		// "dropbox.com",
+		// "ebay.com",
+		// "facebook.com",
+		"github.com",
+		"google.com",
+		// "hotmail.com",
+		// "instagram.com",
+		"linkedin.com",
+		// "pinterest.com",
+		// "reddit.com",
+		// "salesforce.com",
+		// "shopify.com",
+		// "spotify.com",
+		// "twitter.com",
+		// "whatsapp.com",
+		// "yahoo.com",
+		"youtube.com",
+	}, nil
+
+}
+
+func doMultipleDsnLookupHost(req *dsnRequest) {
+	var totalTime time.Duration
+	var avgTime time.Duration
+
+	for domIdx := 0; domIdx < len(req.domains); domIdx++ {
+		nErr := 0
+		for nTest := 0; nTest < req.numberOfTtest; nTest++ {
+			// Do the DNS lookup
+			start := time.Now()
+			_, err := doLookupHostWithTimeout(req.domains[domIdx], req.Timeout2Lookup)
+			if err != nil {
+				nErr++
+				break
+			}
+			elapsed := time.Since(start)
+			totalTime += elapsed
+		}
+		if nErr != 0 {
+			// log.Println("Error", req.providerIp, req.providerName, req.Timeout2Lookup, req.domains[domIdx])
+			req.resultCh <- dnsResult{
+				Error:        errors.New("Time"),
+				providerName: req.providerName,
+				providerIp:   req.providerIp,
+				avgTime:      req.Timeout2Lookup,
+			}
+			return
+		}
+
+	}
+
+	avgTime = totalTime / time.Duration(req.numberOfTtest*len(req.domains))
+
+	req.resultCh <- dnsResult{
+		providerName: req.providerName,
+		providerIp:   req.providerIp,
+		avgTime:      avgTime,
+	}
+}
+
+func doLookupHostWithTimeout(domain string, timeout time.Duration) ([]string, error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return net.DefaultResolver.LookupHost(ctx, domain)
 }
