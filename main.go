@@ -14,7 +14,6 @@ import (
 )
 
 func main() {
-
 	numOfTests := 5
 	timeoutDnsResolve := 1 * time.Second
 	// Get a list of public DNS providers from a public site that lists them for free
@@ -90,7 +89,6 @@ func main() {
 	// Message to the user
 	fmt.Println("\n*We recommend using the DNS provider that has the fastest connection time.")
 	fmt.Println("Less time is better.")
-
 }
 
 type dsnRequest struct {
@@ -138,7 +136,6 @@ func getPublicDNSProviders() (map[string]string, error) {
 }
 
 func getDomains() ([]string, error) {
-
 	return []string{
 		// "amazon.com",
 		// "apple.com",
@@ -161,7 +158,6 @@ func getDomains() ([]string, error) {
 		// "yahoo.com",
 		"youtube.com",
 	}, nil
-
 }
 
 func doMultipleDsnLookupHost(req *dsnRequest) {
@@ -204,7 +200,6 @@ func doMultipleDsnLookupHost(req *dsnRequest) {
 }
 
 func doLookupHostWithTimeout(domain string, timeout time.Duration) ([]string, error) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
